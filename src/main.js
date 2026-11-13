@@ -11,6 +11,9 @@ let trail = 0.0;
 let querySet = null;
 let queryBuffer = null;
 let gpuTimeMs = 0;
+const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 800;
+const maxParticles = isMobile ? 25000 : 150000;
+if (isMobile) count = Math.min(count, 20000);
 
 const fmt = n => Math.round(n).toLocaleString('en-US');
 
@@ -129,7 +132,7 @@ async function rebuildRenderPipeline(format = navigator.gpu.getPreferredCanvasFo
 
 function resize() {
   if (!device) return;
-  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const dpr = Math.min(devicePixelRatio || 1, isMobile ? 1.5 : 2);
   const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
   const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
   if (canvas.width !== w || canvas.height !== h) {
@@ -233,7 +236,7 @@ async function init() {
     await rebuildRenderPipeline(format);
     createBuffers(count);
     statusEl.textContent = 'WEBGPU ACTIVE';
-    log('v0.4 · timestamp queries + trail fade');
+    log(isMobile ? 'v0.8 · mobile mode (capped particles)' : 'v0.8 · desktop');
     statusEl.style.color = '#91e7ce';
     $('gpuMetric').textContent = adapter.info?.device || 'GPU';
     $('runtimePill').textContent = 'JS';
@@ -346,3 +349,21 @@ return config`;
 });
 
 init();
+
+// Mobile / reduced-motion extras
+window.addEventListener('orientationchange', () => setTimeout(resize, 100));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { paused = true; $('pause').textContent = 'Resume'; }
+});
+if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  trail = 0;
+  $('trail').value = 0;
+  $('trailOut').textContent = '0.00';
+  log('reduced-motion: trails off');
+}
+if (isMobile) {
+  $('count').max = maxParticles;
+  $('count').value = count;
+  $('countOut').textContent = fmt(count);
+  log('mobile: particle cap ' + maxParticles);
+}

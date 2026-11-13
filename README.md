@@ -1,4 +1,4 @@
-# Particle Lab α v0.4
+# Particle Lab α v0.8
 
 Browser-native programmable GPU particle simulation experiment.
 
@@ -8,9 +8,10 @@ Browser-native programmable GPU particle simulation experiment.
 
 Working WebGPU compute + render pipeline (JavaScript host).  
 Trail fade is live.  
-GPU timestamp queries are feature-detected and reported in the FPS pill when the adapter supports `timestamp-query` (CPU frame interval remains the fallback).  
-A minimal Rust/WASM seed module source is included under `rust-wasm/` (not yet loaded at runtime).  
-Luau remains a documented next step — not a real runtime in this build.  
+GPU timestamp queries are feature-detected (shown in the FPS pill when supported).  
+Mobile support: lower default particle count, reduced DPR, orientation handling, reduced-motion respect, touch-friendly controls.  
+Rust seed module source is present (not loaded at runtime).  
+Luau remains a documented next step — not a real runtime.  
 No fake performance numbers.
 
 ## Quick start
@@ -21,62 +22,68 @@ npm run dev
 ```
 
 Open the printed localhost URL in a WebGPU-capable browser (recent Chrome or Edge).  
-Hardware acceleration must be enabled. Secure context required.
+Hardware acceleration must be enabled. Secure context required.  
+On mobile, particle count is capped and DPR is lowered automatically.
 
 ## Architecture (current)
 
 - **Host**: Vanilla JS + Vite. Owns the WebGPU device, command encoder, and UI.
-- **GPU**: WGSL compute shader updates particle state in a storage buffer. WGSL render shader draws instanced soft quads.
-- **Parameters**: Uniform buffer written every frame (delta, speed, attraction, turbulence, mouse, time).
-- **Trails**: When trail > 0 the render pass uses `loadOp: 'load'` and a reduced clear.
-- **Timing**: Optional timestamp query set (compute start/end + resolve). Falls back to `requestAnimationFrame` deltas.
-- **Script panel**: Constrained evaluator that accepts a simple `return { ... }` object. This is **not** the official Luau runtime.
-- **Rust**: `rust-wasm/particle_seed` — CPU-side seeding crate (approach B). Build instructions in `rust-wasm/README.md`.
+- **GPU**: WGSL compute shader updates particle state. WGSL render shader draws instanced soft quads.
+- **Parameters**: Uniform buffer written every frame.
+- **Trails**: `loadOp: 'load'` + reduced clear when trail > 0.
+- **Timing**: Optional timestamp queries; `requestAnimationFrame` fallback.
+- **Mobile**: Detects small screens / mobile UA, caps particles (~20k default, 25k max), lowers DPR, handles orientation, respects `prefers-reduced-motion`.
+- **Script panel**: Constrained evaluator (not official Luau).
+- **Rust**: `rust-wasm/particle_seed` — CPU seeding source (approach B).
 
 ## Modes
 
 | Mode | Status | Notes |
 |------|--------|-------|
-| JavaScript baseline | Working | Full compute + render + trail + optional timestamps |
-| Rust/WASM | Source present | Seed module only; not yet loaded in the page |
+| JavaScript baseline | Working | Full compute + render + trail + timestamps + mobile |
+| Rust/WASM | Source present | Seed module only |
 | Luau script | Planned | See `docs/luau.md` |
 
 ## Benchmark methodology
 
-- Particle counts: 10k / 50k / 100k (slider).
+- Particle counts: 10k / 50k / 100k (desktop); lower cap on mobile.
 - FPS is the rolling `requestAnimationFrame` interval.
-- When `timestamp-query` is available, GPU compute interval is shown next to FPS.
-- Do not compare this against a CPU particle loop and call the result a language benchmark.
+- GPU compute time shown when `timestamp-query` is available.
+- Do not treat this as a language benchmark.
 
 ## Known limitations
 
-- Official Luau runtime is not compiled to WASM in this tree.
-- Rust WASM seed is source-only; not linked into the live page yet.
+- Official Luau runtime is not compiled to WASM.
+- Rust WASM seed is source-only.
 - No Rust `wgpu` device ownership.
-- Trail is still a simple fade (load previous frame).
+- Trail is a simple fade.
 - Particle size change rebuilds the render pipeline.
-- Timestamp query read-back is best-effort and not on every frame.
-- Mobile / Safari WebGPU support varies; the error overlay is the intended graceful path.
+- Timestamp read-back is best-effort.
+- Mobile WebGPU support still varies by browser/OS; error overlay is the graceful path.
 
 ## Next practical steps
 
-1. Build the official Luau runtime for `wasm32-unknown-unknown` and expose a narrow host API.
-2. Wire the Rust seed module (`wasm-bindgen` output) into the host so Reset can call it.
-3. Replace the simple trail fade with a short history buffer or ping-pong accumulation texture.
-4. Add device-loss recovery and a reduced-motion mode.
+1. Official Luau WASM runtime + narrow host API.
+2. Wire the Rust seed module into Reset.
+3. Ping-pong accumulation texture for better trails.
+4. Device-loss recovery that fully re-creates pipelines.
 
 ## Changelog
 
-- **0.4** — timestamp queries (feature-detected), Rust seed module source, README update.
-- **0.3** — trail fade, script log fix, deploy note.
-- **0.2** — Vite modular structure, scientific UI, docs, constrained script evaluator.
+- **0.8** — mobile support (particle cap, lower DPR, orientation, reduced-motion, touch-friendly CSS).
+- **0.7** — polish + visibility pause + better resize.
+- **0.6** — reduced-motion respect, device-loss note.
+- **0.5** — log fix, mobile detection groundwork.
+- **0.4** — timestamp queries, Rust seed source.
+- **0.3** — trail fade.
+- **0.2** — Vite modular structure.
 
 ## Files
 
 - `index.html` — layout
-- `src/main.js` — WebGPU host + UI wiring
-- `src/style.css` — instrument styling
+- `src/main.js` — WebGPU host + UI + mobile
+- `src/style.css` — instrument styling + mobile refinements
 - `shaders/*.wgsl` — compute and render
-- `rust-wasm/` — seed module source + build notes
+- `rust-wasm/` — seed module source
 - `docs/` — integration notes
-- `luau-examples/` — example scripts (intended for the future runtime)
+- `luau-examples/` — example scripts
